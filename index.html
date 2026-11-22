@@ -482,8 +482,109 @@
   </style>
   <noscript><style>.viz { display: none; } .hero-grid { grid-template-columns: minmax(0, 46rem); }</style></noscript>
   <script>document.documentElement.classList.add('js');</script>
+  <!-- ===== Loading screen (added) ===== -->
+  <link rel="preload" as="image" href="assets/kinfit-logo-light.png">
+  <style id="kf-loader-css">
+    #kf-loader { display: none; }
+    html.is-loading { overflow: hidden; }
+    html.is-loading #kf-loader {
+      position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; overflow: hidden;
+      background:
+        radial-gradient(900px 600px at 50% 45%, rgba(47, 91, 234, .38), transparent 62%),
+        radial-gradient(600px 400px at 12% 0%, rgba(91, 227, 160, .10), transparent 60%),
+        linear-gradient(180deg, #070E1F, #0B1730 60%, #0d1b3a);
+      transition: opacity .6s ease, visibility 0s linear .6s;
+    }
+    #kf-loader::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+      background-image: radial-gradient(rgba(127, 162, 255, .2) 1px, transparent 1px); background-size: 28px 28px;
+      -webkit-mask-image: radial-gradient(ellipse at 50% 45%, #000 0, transparent 70%); mask-image: radial-gradient(ellipse at 50% 45%, #000 0, transparent 70%); }
+    #kf-loader.leave { opacity: 0; visibility: hidden; }
+    .kf-stage { position: relative; display: grid; justify-items: center; gap: 2.4rem; padding: 1.5rem; transition: transform .6s cubic-bezier(.2, .7, .2, 1), opacity .5s ease; }
+    #kf-loader.leave .kf-stage { transform: scale(1.06); opacity: 0; }
+    .kf-mark { position: relative; display: grid; place-items: center; width: min(70vw, 340px); }
+    .kf-rings span { position: absolute; left: 50%; top: 50%; width: 230px; height: 230px; border-radius: 50%; border: 1.5px solid rgba(127, 162, 255, .55);
+      transform: translate(-50%, -50%) scale(.55); opacity: 0; animation: kf-ring 2.4s ease-out infinite; }
+    .kf-rings span:nth-child(2) { animation-delay: .8s; }
+    .kf-rings span:nth-child(3) { animation-delay: 1.6s; }
+    .kf-logo { position: relative; display: block; width: min(62vw, 290px); height: auto; filter: drop-shadow(0 0 28px rgba(91, 227, 160, .25)); animation: kf-pulse 2s ease-in-out infinite; }
+    .kf-bar { width: min(58vw, 240px); height: 4px; border-radius: 4px; overflow: hidden; background: rgba(127, 162, 255, .22); }
+    .kf-bar i { display: block; width: 100%; height: 100%; border-radius: 4px; background: linear-gradient(90deg, #2F5BEA, #5BE3A0); transform-origin: left center; transform: scaleX(.04); will-change: transform; }
+    #kf-loader.done .kf-bar i { transition: transform .25s ease; }
+    .kf-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    @keyframes kf-ring { 0% { transform: translate(-50%, -50%) scale(.55); opacity: .6; } 100% { transform: translate(-50%, -50%) scale(1.55); opacity: 0; } }
+    @keyframes kf-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035); } }
+    @media (prefers-reduced-motion: reduce) {
+      html.is-loading #kf-loader { transition-duration: .2s; }
+      .kf-rings span, .kf-logo { animation: none; }
+      .kf-rings { display: none; }
+      .kf-stage, #kf-loader.leave .kf-stage { transition: none; transform: none; }
+    }
+  </style>
+  <noscript><style>#kf-loader { display: none !important; }</style></noscript>
+  <script>
+    /* shows the loader before the first paint, and guarantees it is removed even if something else fails */
+    (function () {
+      var r = document.documentElement; r.classList.add('is-loading'); window.__kfT0 = Date.now();
+      setTimeout(function () { r.classList.remove('is-loading'); }, 8000);
+    })();
+  </script>
 </head>
 <body>
+  <!-- ===== Loading screen (added) ===== -->
+  <div id="kf-loader" role="status" aria-live="polite">
+    <div class="kf-stage">
+      <div class="kf-mark">
+        <div class="kf-rings" aria-hidden="true"><span></span><span></span><span></span></div>
+        <img class="kf-logo" src="assets/kinfit-logo-light.png" alt="" width="640" height="294">
+      </div>
+      <div class="kf-bar" aria-hidden="true"><i></i></div>
+    </div>
+    <span class="kf-sr">Loading Kinfit</span>
+  </div>
+  <!-- Loading screen script (added). It sits right after the loader on purpose, so slower scripts further down the page cannot delay it. -->
+  <script>
+  (function () {
+    'use strict';
+    var root = document.documentElement, L = document.getElementById('kf-loader');
+    if (!L || !root.classList.contains('is-loading')) return;
+    var bar = L.querySelector('.kf-bar i');
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var MIN = reduce ? 350 : 1000, MAX = 6000, t0 = window.__kfT0 || Date.now();
+    var domReady = document.readyState !== 'loading', logoReady = false, logoWatched = false, finished = false;
+
+    /* ready = page parsed + the nav logo loaded. Slow outside content such as the video embed is NOT waited for. */
+    function watchLogo() {
+      if (logoWatched) return; logoWatched = true;
+      var logo = document.querySelector('.brand-logo');
+      if (!logo || logo.complete) { logoReady = true; return; }
+      logo.addEventListener('load', function () { logoReady = true; });
+      logo.addEventListener('error', function () { logoReady = true; });
+    }
+    if (domReady) watchLogo();
+    else document.addEventListener('DOMContentLoaded', function () { domReady = true; watchLogo(); });
+
+    function remove() { root.classList.remove('is-loading'); if (L.parentNode) L.parentNode.removeChild(L); }
+    function finish() {
+      if (finished) return; finished = true;
+      L.classList.add('done'); bar.style.transform = 'scaleX(1)';
+      setTimeout(function () { L.classList.add('leave'); }, 280);
+      setTimeout(remove, 950);
+    }
+    /* the bar animates every frame; readiness is checked on a timer so a busy page can't delay the exit */
+    function paint() {
+      if (finished) return;
+      if (!reduce) bar.style.transform = 'scaleX(' + (0.04 + 0.88 * (1 - Math.exp(-(Date.now() - t0) / 900))).toFixed(3) + ')';
+      requestAnimationFrame(paint);
+    }
+    requestAnimationFrame(paint);
+    var timer = setInterval(function () {
+      var el = Date.now() - t0;
+      if ((domReady && logoReady && el >= MIN) || el >= MAX) { clearInterval(timer); finish(); }
+    }, 50);
+    window.addEventListener('pageshow', function (e) { if (e.persisted) { finished = true; remove(); } });
+  })();
+  </script>
+
   <a class="skip-link" href="#main">Skip to main content</a>
 
   <!-- ============================================================
@@ -937,7 +1038,7 @@
         <ul class="team-grid" data-stagger>
           <li class="member reveal"><span class="avatar" aria-hidden="true">B</span><p class="name">Bosilu Jayasuriya</p><p class="role">Main lead and AI lead</p></li>
           <li class="member reveal"><span class="avatar" aria-hidden="true">C</span><p class="name">Charith Kalhara</p><p class="role">Mobile app lead</p></li>
-          <li class="member reveal"><span class="avatar" aria-hidden="true">M</span><p class="name">Maatheyshan Gwreesan</p><p class="role">Trainer web portal lead</p></li>
+          <li class="member reveal"><span class="avatar" aria-hidden="true">M</span><p class="name">Maatheyshan Gowreesan</p><p class="role">Trainer web portal lead</p></li>
           <li class="member reveal"><span class="avatar" aria-hidden="true">K</span><p class="name">Kothma Jayasooriya</p><p class="role">Backend and database lead</p></li>
           <li class="member reveal"><span class="avatar" aria-hidden="true">I</span><p class="name">Indumina Bandara</p><p class="role">QA and safety workflow lead</p></li>
         </ul>
@@ -995,8 +1096,8 @@
     </div>
   </footer>
 
-  <!-- Three.js r128 (UMD build, pinned). If it fails to load, the hero simply shows the text. -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- Three.js r128 (UMD build), hosted with the site so no visitor data goes to a third-party CDN. If it fails to load, the hero simply shows the text. -->
+  <script src="assets/three.min.js"></script>
   <script>
   (function () {
     'use strict';
